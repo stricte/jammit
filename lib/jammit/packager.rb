@@ -65,7 +65,9 @@ module Jammit
       raise OutputNotWritable, "Jammit doesn't have permission to write to \"#{output_dir}\"" unless File.writable?(output_dir)
       mtime ||= latest_mtime package_for(package, extension.to_sym)[:paths]
       files = []
-      fingerprint = Digest::MD5.hexdigest(contents)
+      # We encode the fingerprint with UTF-8 since otherwise its yaml representation is
+      # an unreadable binary string
+      fingerprint = Digest::MD5.hexdigest(contents).encode("UTF-8")
       name = Jammit.fingerprints_enabled? ? "#{package}-#{fingerprint}" : package
       files << file_name = File.join(output_dir, Jammit.filename(name, extension, suffix))
       File.open(file_name, 'wb+') {|f| f.write(contents) }
@@ -120,7 +122,23 @@ module Jammit
       paths
     end
 
-    # In Rails, the difference between a path and an asset URL is "public".    
+    # In case we have assets in gems, we may want to pack them from there.
+    # This adds support for additional root paths through :root_path definition in included assets YAML files
+    #
+    # File assets1.yml:
+    #
+    # includes:
+    #    - "/foo/bar/config/assets2.yml"
+    #
+    # File assets2.yml
+    #
+    # root_path: /foo/bar
+    #
+    # javascripts:
+    #    something:
+    #      - "/foo/bar/public/javascripts/shomething.js"
+    #
+    # In Rails, the difference between a path and an asset URL is "public".
     def path_to_url
       @path_to_url ||= /\A#{Regexp.escape(ASSET_ROOT)}(\/?#{Regexp.escape(Jammit.public_root.sub(ASSET_ROOT, ''))})?/
     end
